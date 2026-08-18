@@ -15,6 +15,7 @@
 - يمكنك تغيير تكلفة الخدمات من الثوابت أدناه
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -47,6 +48,7 @@ from telegram.ext import (
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8935045945:AAENJUB7xZx7L44MtdrkQ6aZ81Xbwn4Nr2k")
 DEVELOPER_ID = 8858067249          # ايدي المطور
 DEVELOPER_USERNAME = "@Aaaaaaq08pu"  # يوزر المطور
+TELEGRAM_RELAY_URL = os.environ.get("TELEGRAM_RELAY_URL", "").strip().rstrip("/")
 
 # تكلفة الخدمات (بالنقاط)
 SPAM_SERVICE_COST = 10             # تكلفة خدمة الرشق لكل طلب
@@ -224,14 +226,20 @@ def spam_service_boost(target_link: str, quantity: int = 10):
         return {"success": False, "message": f"خطأ في الاتصال بمزود الخدمة: {e}", "order_id": None}
 
 def validate_telegram_link(link: str):
-    """التحقق من صحة رابط تلغرام.”"""
-    pattern = r"^https?://(t\.me|telegram\.me)/[a-zA-Z0-9_]{4,}"
-    if re.match(pattern, link.strip()):
-        return True
-    # يقبل أيضاً الروابط بصيغة @username
-    if re.match(r"^@[a-zA-Z0-9_]{4,}$", link.strip()):
-        return True
-    return False
+    """التحقق من صيغة رابط عام أو رابط دعوة Telegram دون الاتصال بالشبكة."""
+    value = link.strip()
+    public_pattern = r"^https?://(?:t\.me|telegram\.me)/[A-Za-z0-9_]{4,}/?(?:\?.*)?$"
+    invite_pattern = r"^https?://(?:t\.me|telegram\.me)/(?:\+[A-Za-z0-9_-]{5,}|joinchat/[A-Za-z0-9_-]{5,})/?(?:\?.*)?$"
+    return bool(
+        re.fullmatch(public_pattern, value)
+        or re.fullmatch(invite_pattern, value)
+        or re.fullmatch(r"@[A-Za-z0-9_]{4,}", value)
+    )
+
+
+def is_private_invite_link(link: str):
+    """يعيد True لروابط الدعوة التي لا تمثل اسماً عاماً يمكن للمزود الوصول إليه."""
+    return bool(re.match(r"^https?://(?:t\.me|telegram\.me)/(?:\+|joinchat/)", link.strip()))
 
 # ============================================================
 # ============ الخدمة الثانية: الأرقام الوهمية ================
@@ -601,6 +609,14 @@ async def spam_link_received(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 parse_mode="HTML",
             )
             return WAITING_SPAM_LINK
+    if is_private_invite_link(link):
+        await update.message.reply_text(
+            "⚠️ رابط الدعوة الخاص صحيح، لكن مزود الخدمة الخارجي لا يستطيع معالجة المجموعات الخاصة عبر رابط دعوة.\n\n"
+            "أرسل رابطاً عاماً بصيغة:\n<code>https://t.me/username</code>\n\n"
+            "أو اكتب /cancel للإلغاء.",
+            parse_mode="HTML",
+        )
+        return WAITING_SPAM_LINK
     context.user_data["spam_link"] = link
     # الكمية ثابتة = 10 حسب المزود المجاني
     context.user_data["spam_quantity"] = SPAM_MAX_QUANTITY
@@ -717,7 +733,8 @@ async def number_platform_selected(update: Update, context: ContextTypes.DEFAULT
         "يرجى الانتظار قليلاً...",
         parse_mode="HTML",
     )
-    numbers = get_all_temp_numbers()
+    # لا يجوز استدعاء Playwright Sync API من حلقة asyncio الخاصة بـ python-telegram-bot.
+    numbers = await asyncio.to_thread(get_all_temp_numbers)
     if not numbers:
         text = (
             "⚠️ لم نتمكن من جلب الأرقام حالياً (الموقع محمي أو غير متاح).\n\n"
@@ -725,6 +742,7 @@ async def number_platform_selected(update: Update, context: ContextTypes.DEFAULT
         )
         await query.edit_message_text(text, reply_markup=build_main_keyboard())
         return ConversationHandler.END
+    context.user_data["available_numbers"] = numbers
     # إنشاء أزرار الأرقام (حد أقصى 10 في كل صفحة)
     buttons = []
     for n in numbers[:10]:
@@ -751,12 +769,14 @@ async def number_picked(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_no_balance_message(query, update, context)
         return ConversationHandler.END
     await query.edit_message_text("⏳ جاري تجهيز الرقم...")
-    # جلب الرقم المحدد
-    numbers = get_all_temp_numbers()
+    # جلب الرقم المحدد من المصدر، ثم من القائمة المعروضة إذا تبدل المصدر مؤقتاً.
+    fresh_numbers = await asyncio.to_thread(get_all_temp_numbers)
+    numbers = fresh_numbers or context.user_data.get("available_numbers", [])
     chosen = next((n for n in numbers if n["id"] == number_id), None)
     if not chosen:
         await query.edit_message_text("❌ هذا الرقم لم يعد متاحاً، اختر رقماً آخر.")
         return WAITING_NUMBER_PLATFORM
+    context.user_data["selected_number"] = chosen
     deduct_balance(user_id, NUMBERS_SERVICE_COST)
     log_order(user_id, "رقم وهمي", f"{NUMBERS_MAP[platform]['site_name']} - {chosen['number']}", 1, NUMBERS_SERVICE_COST, "ناجح")
     new_balance = get_balance(user_id)
@@ -782,14 +802,13 @@ async def fetch_sms_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """جلب الرسائل الواردة على الرقم المختار."""
     query = update.callback_query
     await query.answer("⏳ جاري جلب الرسائل...")
-    # البحث عن آخر رقم تم اختياره من الأزرار
-    numbers = get_all_temp_numbers()
-    chosen = numbers[0] if numbers else None
+    # يجب قراءة رسائل الرقم الذي اختاره المستخدم، لا أول رقم متاح من المصدر.
+    chosen = context.user_data.get("selected_number")
     if not chosen:
         await query.edit_message_text("⚠️ تعذر جلب الرسائل حالياً، حاول بعد قليل.")
         return WAITING_NUMBER_PLATFORM
     await query.edit_message_text("⏳ جاري جلب الرسائل الواردة على الرقم...")
-    messages = get_number_messages(int(chosen["id"]))
+    messages = await asyncio.to_thread(get_number_messages, int(chosen["id"]))
     if messages:
         lines = []
         for m in messages:
@@ -1052,7 +1071,13 @@ async def my_account_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 def main():
     init_db()
-    app = Application.builder().token(BOT_TOKEN).build()
+    application_builder = Application.builder().token(BOT_TOKEN)
+    if TELEGRAM_RELAY_URL:
+        application_builder = application_builder.base_url(f"{TELEGRAM_RELAY_URL}/bot").base_file_url(
+            f"{TELEGRAM_RELAY_URL}/file/bot"
+        )
+        logger.info("يستخدم البوت جسر Telegram API المحدد في TELEGRAM_RELAY_URL")
+    app = application_builder.build()
     # الأوامر
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))

@@ -7,3 +7,5 @@ services:
     envVars:
       - key: BOT_TOKEN
         value: "8935045945:AAENJUB7xZx7L44MtdrkQ6aZ81Xbwn4Nr2k"
+      - key: TELEGRAM_RELAY_URL
+        sync: false
