@@ -187,6 +187,33 @@ def get_buzt_nonce():
     # قيمة احتياطية معروفة
     return "d4da2c9622"
 
+
+def parse_buzt_response(data):
+    """توحيد استجابات BuztGrowth، بما فيها الحالات التي تكون فيها data رقماً."""
+    default_failure = "فشل تنفيذ الطلب، حاول لاحقاً"
+    if not isinstance(data, dict):
+        return {"success": False, "message": default_failure, "order_id": None}
+
+    payload = data.get("data")
+    success = bool(data.get("success"))
+    if isinstance(payload, dict):
+        message = payload.get("message")
+        order_id = payload.get("order_id")
+    elif isinstance(payload, (str, int, float)):
+        # بعض نسخ المزود تعيد رقم الطلب أو رمز الخطأ مباشرة بدلاً من كائن JSON.
+        message = None
+        order_id = payload if success else None
+    else:
+        message = None
+        order_id = None
+
+    return {
+        "success": success,
+        "message": str(message) if message else ("تم تنفيذ الطلب بنجاح" if success else default_failure),
+        "order_id": order_id,
+    }
+
+
 def spam_service_boost(target_link: str, quantity: int = 10):
     """
     تنفيذ طلب الرشق عبر BuztGrowth المجاني.
@@ -209,21 +236,10 @@ def spam_service_boost(target_link: str, quantity: int = 10):
             },
             timeout=30,
         )
-        data = resp.json()
-        if data.get("success"):
-            return {
-                "success": True,
-                "message": data["data"].get("message", "تم تنفيذ الطلب بنجاح"),
-                "order_id": data["data"].get("order_id"),
-            }
-        return {
-            "success": False,
-            "message": data.get("data", {}).get("message", "فشل تنفيذ الطلب، حاول لاحقاً"),
-            "order_id": None,
-        }
+        return parse_buzt_response(resp.json())
     except Exception as e:
         logger.error("خطأ في طلب الرشق: %s", e)
-        return {"success": False, "message": f"خطأ في الاتصال بمزود الخدمة: {e}", "order_id": None}
+        return {"success": False, "message": "تعذر الاتصال بمزود الخدمة، حاول لاحقاً.", "order_id": None}
 
 def validate_telegram_link(link: str):
     """التحقق من صيغة رابط عام أو رابط دعوة Telegram دون الاتصال بالشبكة."""
