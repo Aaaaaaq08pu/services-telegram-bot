@@ -243,19 +243,6 @@ def validate_telegram_link(link: str):
 # في حال أردت تغيير المزود، عدّل دالة fetch_virtual_number().
 # ============================================================
 
-SPAM_PLATFORM_NAMES = {
-    "instagram": "انستقرام",
-    "telegram": "تيليجرام",
-    "facebook": "فيسبوك",
-    "tiktok": "تيك توك",
-    "threads": "ثريدز",
-    "kwai": "كـواي",
-    "youtube": "يوتيوب",
-    "whatsapp": "واتساب",
-    "kick": "كيهيك",
-    "twitter": "تويتر",
-}
-
 NUMBERS_MAP = {
     "whatsapp": {"site_name": "واتساب", "site_id": "whatsapp"},
     "telegram": {"site_name": "تيليجرام", "site_id": "telegram"},
@@ -355,76 +342,23 @@ def get_number_messages(number_id: int, tries: int = 3):
 # ============================================================
 
 def build_main_keyboard():
-    """القائمة الرئيسية بأسلوب بوت السلطان."""
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("♡ شراء أرقام وهمية ♡", callback_data="section_numbers"),
+            InlineKeyboardButton("⚡ رشق قنوات ومجموعات", callback_data="service_spam"),
         ],
         [
-            InlineKeyboardButton("♡ قسم شحن الألعاب ♡", callback_data="section_games"),
-            InlineKeyboardButton("♡ إشحن حسابك ♡", callback_data="buy_credits"),
+            InlineKeyboardButton("📱 أرقام وهمية", callback_data="service_numbers"),
         ],
         [
-            InlineKeyboardButton("♡ قسم الرشق وزيادة المتابعين ♡", callback_data="section_spam"),
+            InlineKeyboardButton("💰 رصيدي", callback_data="my_balance"),
+            InlineKeyboardButton("📜 طلباتي", callback_data="my_orders"),
         ],
         [
-            InlineKeyboardButton("♡ شراء نجوم Telegram الذهبية ♡", callback_data="section_stars"),
+            InlineKeyboardButton(f"🛒 شراء رصيد {DEVELOPER_USERNAME}", callback_data="buy_credits"),
         ],
         [
-            InlineKeyboardButton("♡ مشاركة رابط الدعوة الخاص بك ♡", callback_data="invite_link"),
+            InlineKeyboardButton("❓ تعليمات الاستخدام", callback_data="help_info"),
         ],
-        [
-            InlineKeyboardButton("♡ حالة طلباتي ♡", callback_data="my_orders"),
-            InlineKeyboardButton("♡ الإعدادات ♡", callback_data="section_settings"),
-        ],
-        [
-            InlineKeyboardButton("♡ الدعم الفني ♡", url="https://t.me/Aaaaaaq08pu"),
-        ],
-    ])
-
-
-def build_spam_platforms_keyboard():
-    """قسم الرشق بخدمات متعددة المنصات بأسلوب بوت السلطان."""
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("• انستقرام •", callback_data="sp_instagram"),
-            InlineKeyboardButton("• تيليجرام •", callback_data="sp_telegram"),
-        ],
-        [
-            InlineKeyboardButton("• فيسبوك •", callback_data="sp_facebook"),
-            InlineKeyboardButton("• تيك توك •", callback_data="sp_tiktok"),
-        ],
-        [
-            InlineKeyboardButton("• ثريدز •", callback_data="sp_threads"),
-            InlineKeyboardButton("• كـواي •", callback_data="sp_kwai"),
-        ],
-        [
-            InlineKeyboardButton("• يوتيوب •", callback_data="sp_youtube"),
-            InlineKeyboardButton("• واتساب •", callback_data="sp_whatsapp"),
-        ],
-        [
-            InlineKeyboardButton("• كيهيك •", callback_data="sp_kick"),
-            InlineKeyboardButton("• تويتر •", callback_data="sp_twitter"),
-        ],
-        [InlineKeyboardButton("• الصفحة الرئيسية •", callback_data="main_menu")],
-    ])
-
-
-def build_numbers_keyboard():
-    """قسم الأرقام الوهمية بأسلوب بوت السلطان."""
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("عروض الواتساب", callback_data="num_whatsapp"),
-            InlineKeyboardButton("أرقام جاهزة TG", callback_data="num_telegram"),
-        ],
-        [
-            InlineKeyboardButton("شراء أرقام لتطبيقات أخرى", callback_data="num_other_apps"),
-        ],
-        [
-            InlineKeyboardButton("الاكثر توفراً واتساب", callback_data="num_whatsapp"),
-            InlineKeyboardButton("شراء رقم جاهز", callback_data="num_ready"),
-        ],
-        [InlineKeyboardButton("- رجوع.", callback_data="main_menu")],
     ])
 
 async def send_no_balance_message(update_or_callback, update, context):
@@ -456,15 +390,14 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     create_user(user.id, user.username)
     balance = get_balance(user.id)
-    name = user.first_name or user.username or "عزيزي"
     text = (
-        "• ≪ اهلا بك عزيزي : " + name + " 🤚\n"
-        "══════ ☠️ ══════\n"
-        f"• رصيد حسابك الان : {balance} ⏎\n"
-        f"• اايدي الحساب : {user.id} 👤\n"
-        "════════════════\n"
-        "≪ اتحكم بالبوت من خلال الازرار بالأسفل\n"
-        "⬇️"
+        "🌟 مرحباً بك في بوت الخدمات التجارية!\n\n"
+        f"👤 {user.mention_html()}\n"
+        f"💰 رصيدك الحالي: <b>{balance}</b> نقطة\n\n"
+        "📌 الخدمات المتاحة:\n"
+        f"⚡ <b>رشق القنوات والمجموعات</b> - التكلفة: {SPAM_SERVICE_COST} نقطة لكل طلب\n"
+        f"📱 <b>أرقام وهمية مؤقتة</b> - التكلفة: {NUMBERS_SERVICE_COST} نقطة لكل رقم\n\n"
+        "✅ اختر الخدمة من القائمة أدناه للبدء:"
     )
     await update.message.reply_text(text, parse_mode="HTML", reply_markup=build_main_keyboard())
 
@@ -819,8 +752,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
     user_id = query.from_user.id
-    if data.startswith(("num_", "picknum_", "fetch_sms", "spam_execute", "sp_", "section_")):
-        return  # هذه تُعالج داخل الأزرار الجديدة أعلاه
+    if data.startswith(("num_", "picknum_", "fetch_sms", "spam_execute")):
+        return  # هذه تُعالج داخل المحادثات
     if data == "service_spam":
         return await spam_start(update, context)
     if data == "service_numbers":
@@ -864,139 +797,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = query.from_user
         create_user(user.id, user.username)
         balance = get_balance(user.id)
-        name = user.first_name or user.username or "عزيزي"
-        text = (
-            "• ≪ اهلا بك عزيزي : " + name + " 🤚\n"
-            "══════ ☠️ ══════\n"
-            f"• رصيد حسابك الان : {balance} ⏎\n"
-            f"• اايدي الحساب : {user.id} 👤\n"
-            "════════════════\n"
-            "≪ اتحكم بالبوت من خلال الازرار بالأسفل\n"
-            "⬇️"
-        )
+        text = f"🏠 <b>القائمة الرئيسية</b>\n💰 رصيدك: <b>{balance}</b> نقطة\n\n"
         await query.edit_message_text(
             text, parse_mode="HTML", reply_markup=build_main_keyboard()
         )
-    elif data == "section_spam":
-        text = (
-            "☯️ خدمة الرشق لجميع منصات التواصل الاجتماعي\n"
-            "────────────────\n"
-            "<u>تساعدك في <b>زيادة متابعين</b> وتفاعلات صفحتك</u>\n"
-            "<u>توفر خدمات <b>متابعين وإعجابات ومشاهدات</b></u>\n"
-            "<u><b>أسعار مناسبة</b> تتفاوت من حيث الجودة والسرعة</u>\n"
-            "────────────────\n"
-            "≪ <u>الرجاء إختيار البرنامج المواد rasha . ☯️ : مُنه</u>\n\n"
-        )
-        await query.edit_message_text(text, parse_mode="HTML", reply_markup=build_spam_platforms_keyboard())
-    elif data.startswith("sp_"):
-        platform = data.replace("sp_", "")
-        if platform == "telegram":
-            return await spam_start(update, context)
-        # باقي المنصات: خدمة وهمية مؤقتة (تُشغل نفس آلية الرشق كبديل قابل للتبديل)
-        text = (
-            f"• ≪ قسم الرشق : {SPAM_PLATFORM_NAMES.get(platform, platform)}\n"
-            "══════ ☠️ ══════\n"
-            "• ارسل رابط الحساب / الصفحة / القناة\n"
-            "• سيتم خصم النقاط تلقائياً من رصيدك\n"
-            "════════════════\n"
-            "≪ اتحكم بالبوت من خلال الازرار بالأسفل\n"
-            "⬇️"
-        )
-        context.user_data["spam_platform"] = platform
-        await query.edit_message_text(text, parse_mode="HTML")
-        # نبدأ محادثة الرشق بنفس الحالة (انتظار الرابط)
-        return await spam_start(update, context)
-    elif data == "section_numbers":
-        user = query.from_user
-        create_user(user.id, user.username)
-        balance = get_balance(user.id)
-        name = user.first_name or user.username or "عزيزي"
-        text = (
-            "• ≪ اهلا بك عزيزي : " + name + " 🤚\n"
-            "══════ ☠️ ══════\n"
-            "• - في قسم الارقام الوهمية\n"
-            "• - ارقام وهمية جميع الدول وجميع المنصات\n"
-            "• - سيرفرات متعددة وسريعه في وصول الكود\n"
-            "• - إختار ما تريدة من الاسفل ⬇️\n"
-            "•────────────────•"
-        )
-        await query.edit_message_text(text, parse_mode="HTML", reply_markup=build_numbers_keyboard())
-    elif data == "num_other_apps":
-        # تطبيقات أخرى -> اختيار المنصة من القائمة المعروفة
-        return await numbers_start(update, context)
-    elif data == "num_ready":
-        # شراء رقم جاهز -> قائمة الأرقام مباشرة (تيليجرام افتراضياً)
-        context.user_data["number_platform"] = "telegram"
-        user_id = query.from_user.id
-        balance = get_balance(user_id)
-        if balance < NUMBERS_SERVICE_COST:
-            return await send_no_balance_message(query, update, context)
-        return await number_platform_selected(update, context)
-    elif data == "section_games":
-        text = (
-            "♡ قسم شحن الألعاب ♡\n"
-            "══════ ☠️ ══════\n"
-            "• هذا القسم قيد التطوير وسيتم تفعيله قريباً.\n"
-            "• تواصل مع المطور لشحن حسابات الألعاب: {DEVELOPER_USERNAME}\n"
-            "════════════════\n"
-            "≪ اتحكم بالبوت من خلال الازرار بالأسفل\n"
-            "⬇️"
-        )
-        await query.edit_message_text(text, parse_mode="HTML", reply_markup=build_main_keyboard())
-    elif data == "section_stars":
-        text = (
-            "♡ شراء نجوم Telegram الذهبية ♡\n"
-            "══════ ☠️ ══════\n"
-            "• هذا القسم قيد التطوير وسيتم تفعيله قريباً.\n"
-            "• تواصل مع المطور لشراء النجوم: {DEVELOPER_USERNAME}\n"
-            "════════════════\n"
-            "≪ اتحكم بالبوت من خلال الازرار بالأسفل\n"
-            "⬇️"
-        )
-        await query.edit_message_text(text, parse_mode="HTML", reply_markup=build_main_keyboard())
-    elif data == "invite_link":
-        user = query.from_user
-        text = (
-            "♡ مشاركة رابط الدعوة الخاص بك ♡\n"
-            "══════ ☠️ ══════\n"
-            f"• رابطك الخاص: https://t.me/Aloweyuibot?start={user.id}\n"
-            "• شارك الرابط مع أصدقائك لدعوتهم للبوت.\n"
-            "════════════════\n"
-            "≪ اتحكم بالبوت من خلال الازرار بالأسفل\n"
-            "⬇️"
-        )
-        await query.edit_message_text(text, parse_mode="HTML", reply_markup=build_main_keyboard())
-    elif data == "section_settings":
-        text = (
-            "• - قسم الإعدادات الخاصة بحسابك في البوت •\n"
-            "══════ ☠️ ══════\n"
-            "≪ اتحكم بالبوت من خلال الازرار بالأسفل\n"
-            "⬇️"
-        )
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("♡ نسخة حسابي ♡", callback_data="settings_account")],
-            [InlineKeyboardButton("♡ احصائيات الحساب ♡", callback_data="my_balance")],
-            [InlineKeyboardButton("♡ قنوات البوت ♡", url="https://t.me/Aaaaaaq08pu")],
-            [InlineKeyboardButton("♡ حالة طلباتي ♡", callback_data="my_orders")],
-            [InlineKeyboardButton("♡ الدعم الفني ♡", url="https://t.me/Aaaaaaq08pu")],
-            [InlineKeyboardButton("- رجوع.", callback_data="main_menu")],
-        ])
-        await query.edit_message_text(text, parse_mode="HTML", reply_markup=keyboard)
-    elif data == "settings_account":
-        user = query.from_user
-        balance = get_balance(user.id)
-        text = (
-            "≪ اهلا بك عزيزي : " + (user.first_name or user.username or "عزيزي") + " 🤚\n"
-            "•≪ في القائمة الرئيسية لدى بوت السلطان 🏠\n"
-            "•────────────────•\n"
-            f"• حسابك : {user.username or user.id}@\n"
-            f"• ايدي الحساب : {user.id} 👤\n"
-            f"• رصيد حسابك الان : {balance} ⏎ 💰\n"
-            "•────────────────•\n"
-            "≪ اتحكم بالبوت من خلال الازرار بالأسفل\n"
-            "⬇️"
-        )
-        await query.edit_message_text(text, parse_mode="HTML", reply_markup=build_main_keyboard())
     elif data == "num_cancel":
         await query.edit_message_text(
             "❌ تم إلغاء العملية.", reply_markup=build_main_keyboard()
@@ -1014,25 +818,6 @@ async def unknown_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ============ التشغيل ========================================
 # ============================================================
 
-async def my_account_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض نسخة الحساب بأسلوب بوت السلطان."""
-    user = update.effective_user
-    create_user(user.id, user.username)
-    balance = get_balance(user.id)
-    text = (
-        "≪ اهلا بك عزيزي : " + (user.first_name or user.username or "عزيزي") + " 🤚\n"
-        "•≪ في القائمة الرئيسية لدى بوت السلطان 🏠\n"
-        "•────────────────•\n"
-        f"• حسابك : {user.username or user.id}@\n"
-        f"• ايدي الحساب : {user.id} 👤\n"
-        f"• رصيد حسابك الان : {balance} ⏎ 💰\n"
-        "•────────────────•\n"
-        "≪ اتحكم بالبوت من خلال الازرار بالأسفل\n"
-        "⬇️"
-    )
-    await update.message.reply_text(text, parse_mode="HTML", reply_markup=build_main_keyboard())
-
-
 def main():
     init_db()
     app = Application.builder().token(BOT_TOKEN).build()
@@ -1040,7 +825,6 @@ def main():
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("balance", my_balance_command))
-    app.add_handler(CommandHandler("account", my_account_command))
     app.add_handler(CommandHandler("add", add_balance_command))
     app.add_handler(CommandHandler("stats", stats_command))
     app.add_handler(CommandHandler("cancel", cancel_handler))
