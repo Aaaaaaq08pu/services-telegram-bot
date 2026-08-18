@@ -8,8 +8,10 @@ import bot
 
 
 class FakeResponse:
-    def __init__(self, payload):
+    def __init__(self, payload, status_code=200, content_type="application/json"):
         self.payload = payload
+        self.status_code = status_code
+        self.headers = {"content-type": content_type}
 
     def json(self):
         return self.payload
@@ -29,11 +31,24 @@ class BuztResponseTests(unittest.TestCase):
         result = bot.parse_buzt_response({"success": False, "data": 0})
         self.assertFalse(result["success"])
         self.assertIsNone(result["order_id"])
-        self.assertIn("فشل", result["message"])
+        self.assertIn("رفض", result["message"])
+        self.assertIn("0", result["message"])
 
     def test_unexpected_response_does_not_raise(self):
         result = bot.parse_buzt_response(1)
         self.assertFalse(result["success"])
+        self.assertIn("int", result["message"])
+
+    def test_missing_nonce_does_not_submit_a_request(self):
+        with (
+            patch.object(bot, "get_buzt_nonce", return_value=None),
+            patch.object(bot.requests, "post") as post,
+        ):
+            result = bot.spam_service_boost("https://t.me/PublicChannel", 10)
+
+        self.assertFalse(result["success"])
+        self.assertIn("رمز جلسة", result["message"])
+        post.assert_not_called()
 
     def test_service_uses_safe_parser_for_numeric_failure(self):
         with (
@@ -42,7 +57,7 @@ class BuztResponseTests(unittest.TestCase):
         ):
             result = bot.spam_service_boost("https://t.me/PublicChannel", 10)
         self.assertFalse(result["success"])
-        self.assertIn("فشل", result["message"])
+        self.assertIn("رفض", result["message"])
 
 
 if __name__ == "__main__":

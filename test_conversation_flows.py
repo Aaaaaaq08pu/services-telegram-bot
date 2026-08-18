@@ -137,6 +137,24 @@ class ConversationFlowTests(unittest.IsolatedAsyncioTestCase):
         log_order.assert_called_once_with(77, "رشق", "https://t.me/PublicChannel", 10, bot.SPAM_SERVICE_COST, "فشل")
         self.assertIn("لم يتم خصم أي نقاط", query.edits[-1][0])
 
+    async def test_spam_provider_success_deducts_once_and_records_success(self):
+        query = FakeQuery("spam_execute", user_id=77)
+        update = SimpleNamespace(callback_query=query)
+        context = SimpleNamespace(user_data={"spam_link": "https://t.me/PublicChannel", "spam_quantity": 10})
+
+        with (
+            patch.object(bot, "get_balance", return_value=100),
+            patch.object(bot, "spam_service_boost", return_value={"success": True, "message": "تم", "order_id": 123}),
+            patch.object(bot, "deduct_balance") as deduct_balance,
+            patch.object(bot, "log_order") as log_order,
+        ):
+            state = await bot.spam_execute_callback(update, context)
+
+        self.assertEqual(state, bot.ConversationHandler.END)
+        deduct_balance.assert_called_once_with(77, bot.SPAM_SERVICE_COST)
+        log_order.assert_called_once_with(77, "رشق", "https://t.me/PublicChannel", 10, bot.SPAM_SERVICE_COST, "ناجح")
+        self.assertIn("تم تنفيذ طلب الرشق بنجاح", query.edits[-1][0])
+
     async def test_verified_number_reservation_failure_does_not_deduct_balance(self):
         query = FakeQuery("reserve_smsman", user_id=77)
         update = SimpleNamespace(callback_query=query)

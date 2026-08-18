@@ -26,6 +26,7 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -187,15 +188,30 @@ def get_buzt_nonce():
             return match.group(1)
     except Exception as e:
         logger.warning("فشل جلب nonce من BuztGrowth: %s", e)
-    # قيمة احتياطية معروفة
-    return "d4da2c9622"
+    # لا نرسل رمزاً احتياطياً منتهي الصلاحية؛ سيعطي سبب فشل واضح بدلاً من طلب مضلل.
+    return None
+
+
+def describe_spam_target(target_link: str):
+    """إرجاع وصف تشخيصي مختصر للرابط من دون تسجيل رابط دعوة أو اسم كامل."""
+    value = target_link.strip()
+    if value.startswith("@"):
+        return "public_handle"
+    parsed = urlparse(value)
+    if parsed.netloc in {"t.me", "telegram.me"}:
+        return "telegram_private_invite" if parsed.path.startswith(("/+", "/joinchat/")) else "telegram_public_link"
+    return parsed.netloc or "unknown_target"
 
 
 def parse_buzt_response(data):
     """توحيد استجابات BuztGrowth، بما فيها الحالات التي تكون فيها data رقماً."""
     default_failure = "فشل تنفيذ الطلب، حاول لاحقاً"
     if not isinstance(data, dict):
-        return {"success": False, "message": default_failure, "order_id": None}
+        return {
+            "success": False,
+            "message": f"رفض مزود الرشق الطلب (استجابة من نوع {type(data).__name__}).",
+            "order_id": None,
+        }
 
     payload = data.get("data")
     success = bool(data.get("success"))
@@ -209,6 +225,9 @@ def parse_buzt_response(data):
     else:
         message = None
         order_id = None
+
+    if not success and isinstance(payload, (str, int, float)):
+        message = message or f"رفض مزود الرشق الطلب (رمز الاستجابة: {payload})."
 
     return {
         "success": success,
@@ -224,6 +243,9 @@ def spam_service_boost(target_link: str, quantity: int = 10):
     """
     try:
         nonce = get_buzt_nonce()
+        if not nonce:
+            logger.warning("تعذر إنشاء طلب الرشق: لم يعرض المزود رمز جلسة صالحاً target=%s", describe_spam_target(target_link))
+            return {"success": False, "message": "مزود الرشق لم يعط رمز جلسة صالحاً؛ حاول لاحقاً.", "order_id": None}
         resp = requests.post(
             "https://buztgrowth.com/wp-admin/admin-ajax.php",
             data={
@@ -239,9 +261,29 @@ def spam_service_boost(target_link: str, quantity: int = 10):
             },
             timeout=30,
         )
-        return parse_buzt_response(resp.json())
+        try:
+            payload = resp.json()
+        except ValueError:
+            logger.warning(
+                "استجابة رشق غير JSON target=%s http_status=%s content_type=%s",
+                describe_spam_target(target_link),
+                resp.status_code,
+                resp.headers.get("content-type", "unknown"),
+            )
+            return {"success": False, "message": "أعاد مزود الرشق استجابة غير صالحة؛ لم يتم خصم نقاط.", "order_id": None}
+
+        result = parse_buzt_response(payload)
+        logger.info(
+            "نتيجة مزود الرشق target=%s http_status=%s payload_type=%s success=%s order_id=%s",
+            describe_spam_target(target_link),
+            resp.status_code,
+            type(payload).__name__,
+            result["success"],
+            result["order_id"] if result["success"] else "-",
+        )
+        return result
     except Exception as e:
-        logger.error("خطأ في طلب الرشق: %s", e)
+        logger.error("خطأ في طلب الرشق target=%s error_type=%s", describe_spam_target(target_link), type(e).__name__)
         return {"success": False, "message": "تعذر الاتصال بمزود الخدمة، حاول لاحقاً.", "order_id": None}
 
 def validate_telegram_link(link: str):
