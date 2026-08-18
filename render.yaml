@@ -6,6 +6,6 @@ services:
     startCommand: python bot.py
     envVars:
       - key: BOT_TOKEN
-        value: "8935045945:AAENJUB7xZx7L44MtdrkQ6aZ81Xbwn4Nr2k"
+        sync: false
       - key: TELEGRAM_RELAY_URL
         sync: false
