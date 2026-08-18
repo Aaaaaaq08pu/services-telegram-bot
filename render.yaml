@@ -1,0 +1,9 @@
+services:
+  - type: worker
+    name: services-telegram-bot
+    env: python
+    buildCommand: pip install -r requirements.txt && playwright install chromium
+    startCommand: python bot.py
+    envVars:
+      - key: BOT_TOKEN
+        value: "8935045945:AAENJUB7xZx7L44MtdrkQ6aZ81Xbwn4Nr2k"
