@@ -49,6 +49,9 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "8935045945:AAENJUB7xZx7L44MtdrkQ6aZ81Xb
 DEVELOPER_ID = 8858067249          # ايدي المطور
 DEVELOPER_USERNAME = "@Aaaaaaq08pu"  # يوزر المطور
 TELEGRAM_RELAY_URL = os.environ.get("TELEGRAM_RELAY_URL", "").strip().rstrip("/")
+SMS_MAN_API_KEY = os.environ.get("SMS_MAN_API_KEY", "").strip()
+SMS_MAN_COUNTRY_ID = os.environ.get("SMS_MAN_COUNTRY_ID", "0").strip()
+SMS_MAN_API_BASE = "https://api.sms-man.com/control"
 
 # تكلفة الخدمات (بالنقاط)
 SPAM_SERVICE_COST = 10             # تكلفة خدمة الرشق لكل طلب
@@ -290,6 +293,76 @@ NUMBERS_MAP = {
     "twitter": {"site_name": "تويتر", "site_id": "twitter"},
     "snapchat": {"site_name": "سناب شات", "site_id": "snapchat"},
 }
+
+SMS_MAN_PLATFORM_NAMES = {
+    "whatsapp": {"whatsapp", "wa"}, "telegram": {"telegram", "tg"},
+    "facebook": {"facebook", "fb"}, "instagram": {"instagram", "ig"},
+    "tiktok": {"tiktok", "tt"}, "google": {"google", "gmail"},
+    "twitter": {"twitter", "x"}, "snapchat": {"snapchat", "snap"},
+}
+
+
+def sms_man_is_enabled():
+    """يتاح المزود فقط عند ضبط المفتاح في بيئة التشغيل، ولا يسجل المفتاح مطلقاً."""
+    return bool(SMS_MAN_API_KEY)
+
+
+def sms_man_api_request(endpoint: str, **params):
+    """استدعاء محدود لواجهة SMS-Man v2 مع رسائل فشل آمنة."""
+    if not sms_man_is_enabled():
+        return {"success": False, "message": "مزود الأرقام الموثق غير مهيأ حالياً."}
+    try:
+        response = requests.get(
+            f"{SMS_MAN_API_BASE}/{endpoint}",
+            params={"token": SMS_MAN_API_KEY, **params}, timeout=25,
+        )
+        response.raise_for_status()
+        data = response.json()
+        if not isinstance(data, (dict, list)):
+            return {"success": False, "message": "استجابة غير صالحة من مزود الأرقام."}
+        return data
+    except (requests.RequestException, ValueError) as error:
+        logger.warning("تعذر الاتصال بمزود SMS-Man: %s", type(error).__name__)
+        return {"success": False, "message": "تعذر الاتصال بمزود الأرقام الموثق."}
+
+
+def get_sms_man_application_id(platform: str):
+    """مطابقة اسم المنصة مع قائمة الخدمات الحالية التي يعيدها المزود."""
+    applications = sms_man_api_request("applications")
+    if not isinstance(applications, list):
+        return None
+    aliases = SMS_MAN_PLATFORM_NAMES.get(platform, {platform})
+    for application in applications:
+        if not isinstance(application, dict):
+            continue
+        name = str(application.get("name", "")).strip().lower()
+        code = str(application.get("code", "")).strip().lower()
+        if name in aliases or code in aliases:
+            return application.get("id")
+    return None
+
+
+def reserve_sms_man_number(platform: str):
+    """حجز رقم واحد من SMS-Man؛ لا تعدل رصيد مستخدم البوت هنا."""
+    application_id = get_sms_man_application_id(platform)
+    if application_id is None:
+        return {"success": False, "message": "لا توجد خدمة متاحة لهذه المنصة لدى المزود حالياً."}
+    data = sms_man_api_request("get-number", country_id=SMS_MAN_COUNTRY_ID, application_id=application_id)
+    if not isinstance(data, dict) or data.get("success") is False:
+        message = data.get("error_msg", "لم يتوفر رقم من المزود حالياً.") if isinstance(data, dict) else "لم يتوفر رقم من المزود حالياً."
+        return {"success": False, "message": str(message)}
+    request_id, number = data.get("request_id"), data.get("number")
+    if request_id is None or not number:
+        return {"success": False, "message": "أعاد المزود بيانات حجز غير مكتملة."}
+    return {"success": True, "number": str(number), "request_id": str(request_id), "provider": "sms_man"}
+
+
+def get_sms_man_messages(request_id: str):
+    """قراءة رمز التحقق المتاح لطلب تم حجزه من SMS-Man."""
+    data = sms_man_api_request("get-sms", request_id=request_id)
+    if not isinstance(data, dict) or not data.get("sms_code"):
+        return []
+    return [{"sender": "SMS-Man", "message": str(data["sms_code"]), "time": ""}]
 
 def get_all_temp_numbers():
     """جلب قائمة الأرقام الوهمية المتاحة من receive-smss.com."""
@@ -744,6 +817,19 @@ async def number_platform_selected(update: Update, context: ContextTypes.DEFAULT
     if balance < NUMBERS_SERVICE_COST:
         await send_no_balance_message(query, update, context)
         return ConversationHandler.END
+    if sms_man_is_enabled():
+        text = (
+            f"📱 <b>رقم موثّق لمنصة {NUMBERS_MAP[platform]['site_name']}</b>\n\n"
+            f"💰 تكلفة البوت: <b>{NUMBERS_SERVICE_COST} نقطة</b>\n"
+            "🔐 سيتم حجز الرقم من مزود API موثّق عند الضغط أدناه.\n"
+            "لن تُخصم نقاطك إذا تعذر الحجز."
+        )
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✨ حجز رقم موثّق", callback_data="reserve_smsman")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data="num_cancel")],
+        ])
+        await query.edit_message_text(text, parse_mode="HTML", reply_markup=keyboard)
+        return WAITING_NUMBER_PLATFORM
     await query.edit_message_text(
         f"⏳ جاري جلب الأرقام المتاحة لمنصة <b>{NUMBERS_MAP[platform]['site_name']}</b>...\n"
         "يرجى الانتظار قليلاً...",
@@ -771,6 +857,47 @@ async def number_platform_selected(update: Update, context: ContextTypes.DEFAULT
         "⚠️ الأرقام مجانية ومشتركة بين الجميع."
     )
     await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons))
+    return WAITING_NUMBER_PLATFORM
+
+
+async def reserve_sms_man_number_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """يحجز رقماً من المزود الموثق ثم يخصم الرصيد بعد نجاح الحجز فقط."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    platform = context.user_data.get("number_platform", "telegram")
+    if get_balance(user_id) < NUMBERS_SERVICE_COST:
+        await send_no_balance_message(query, update, context)
+        return ConversationHandler.END
+    await query.edit_message_text("⏳ جاري حجز رقم موثّق...")
+    reservation = await asyncio.to_thread(reserve_sms_man_number, platform)
+    if not reservation.get("success"):
+        await query.edit_message_text(
+            f"⚠️ تعذر حجز رقم حالياً.\n\nالسبب: {reservation.get('message', 'خطأ غير معروف')}\n\n💡 لم يتم خصم أي نقاط.",
+            reply_markup=build_main_keyboard(),
+        )
+        return ConversationHandler.END
+    chosen = {
+        "id": f"smsman:{reservation['request_id']}", "number": reservation["number"],
+        "provider": "sms_man", "request_id": reservation["request_id"],
+    }
+    context.user_data["selected_number"] = chosen
+    deduct_balance(user_id, NUMBERS_SERVICE_COST)
+    log_order(user_id, "رقم موثق", f"{NUMBERS_MAP[platform]['site_name']} - {chosen['number']}", 1, NUMBERS_SERVICE_COST, "ناجح")
+    new_balance = get_balance(user_id)
+    text = (
+        "✅ <b>تم حجز رقمك بنجاح!</b>\n\n"
+        f"📱 المنصة: <b>{NUMBERS_MAP[platform]['site_name']}</b>\n"
+        f"🔢 الرقم: <b>{chosen['number']}</b>\n\n"
+        "⏳ انتظر رمز التحقق ثم اضغط الزر أدناه.\n\n"
+        f"💰 النقاط المخصومة: {NUMBERS_SERVICE_COST} نقطة\n"
+        f"💰 رصيدك المتبقي: <b>{new_balance}</b> نقطة"
+    )
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📨 جلب الرسائل الواردة", callback_data="fetch_sms")],
+        [InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="main_menu")],
+    ])
+    await query.edit_message_text(text, parse_mode="HTML", reply_markup=keyboard)
     return WAITING_NUMBER_PLATFORM
 
 async def number_picked(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -824,7 +951,10 @@ async def fetch_sms_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.edit_message_text("⚠️ تعذر جلب الرسائل حالياً، حاول بعد قليل.")
         return WAITING_NUMBER_PLATFORM
     await query.edit_message_text("⏳ جاري جلب الرسائل الواردة على الرقم...")
-    messages = await asyncio.to_thread(get_number_messages, int(chosen["id"]))
+    if chosen.get("provider") == "sms_man":
+        messages = await asyncio.to_thread(get_sms_man_messages, chosen["request_id"])
+    else:
+        messages = await asyncio.to_thread(get_number_messages, int(chosen["id"]))
     if messages:
         lines = []
         for m in messages:
@@ -1128,6 +1258,7 @@ def main():
         states={
             WAITING_NUMBER_PLATFORM: [
                 CallbackQueryHandler(number_platform_selected, pattern="^num_[a-z]+$"),
+                CallbackQueryHandler(reserve_sms_man_number_callback, pattern="^reserve_smsman$"),
                 CallbackQueryHandler(number_picked, pattern="^picknum_"),
                 CallbackQueryHandler(fetch_sms_callback, pattern="^fetch_sms$"),
                 CallbackQueryHandler(button_handler, pattern="^(main_menu|num_cancel)$"),

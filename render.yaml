@@ -9,3 +9,7 @@ services:
         sync: false
       - key: TELEGRAM_RELAY_URL
         sync: false
+      - key: SMS_MAN_API_KEY
+        sync: false
+      - key: SMS_MAN_COUNTRY_ID
+        value: "0"
