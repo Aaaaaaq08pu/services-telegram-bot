@@ -1,9 +1,13 @@
 nohup: ignoring input
-/home/ubuntu/tg_bot/bot.py:1048: PTBUserWarning: If 'per_message=False', 'CallbackQueryHandler' will not be tracked for every message. Read this FAQ entry to learn more about the per_* settings: https://github.com/python-telegram-bot/python-telegram-bot/wiki/Frequently-Asked-Questions#what-do-the-per_-settings-in-conversationhandler-do.
+/home/ubuntu/tg_bot/bot.py:1066: PTBUserWarning: If 'per_message=False', 'CallbackQueryHandler' will not be tracked for every message. Read this FAQ entry to learn more about the per_* settings: https://github.com/python-telegram-bot/python-telegram-bot/wiki/Frequently-Asked-Questions#what-do-the-per_-settings-in-conversationhandler-do.
   spam_conv = ConversationHandler(
-/home/ubuntu/tg_bot/bot.py:1064: PTBUserWarning: If 'per_message=False', 'CallbackQueryHandler' will not be tracked for every message. Read this FAQ entry to learn more about the per_* settings: https://github.com/python-telegram-bot/python-telegram-bot/wiki/Frequently-Asked-Questions#what-do-the-per_-settings-in-conversationhandler-do.
+/home/ubuntu/tg_bot/bot.py:1082: PTBUserWarning: If 'per_message=False', 'CallbackQueryHandler' will not be tracked for every message. Read this FAQ entry to learn more about the per_* settings: https://github.com/python-telegram-bot/python-telegram-bot/wiki/Frequently-Asked-Questions#what-do-the-per_-settings-in-conversationhandler-do.
   nums_conv = ConversationHandler(
-2026-08-18 16:48:17,636 - tgbot - INFO - 🚀 تم تشغيل البوت بنجاح!
-2026-08-18 16:48:22,086 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8935045945:AAENJUB7xZx7L44MtdrkQ6aZ81Xbwn4Nr2k/getMe "HTTP/1.1 200 OK"
-2026-08-18 16:48:22,472 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8935045945:AAENJUB7xZx7L44MtdrkQ6aZ81Xbwn4Nr2k/deleteWebhook "HTTP/1.1 200 OK"
-2026-08-18 16:48:22,474 - telegram.ext.Application - INFO - Application started
+2026-08-18 16:49:16,511 - tgbot - INFO - 🚀 تم تشغيل البوت بنجاح!
+2026-08-18 16:49:18,833 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8935045945:AAENJUB7xZx7L44MtdrkQ6aZ81Xbwn4Nr2k/getMe "HTTP/1.1 200 OK"
+2026-08-18 16:49:19,286 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8935045945:AAENJUB7xZx7L44MtdrkQ6aZ81Xbwn4Nr2k/deleteWebhook "HTTP/1.1 200 OK"
+2026-08-18 16:49:19,287 - telegram.ext.Application - INFO - Application started
+2026-08-18 16:49:22,670 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8935045945:AAENJUB7xZx7L44MtdrkQ6aZ81Xbwn4Nr2k/getUpdates "HTTP/1.1 200 OK"
+2026-08-18 16:49:31,673 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8935045945:AAENJUB7xZx7L44MtdrkQ6aZ81Xbwn4Nr2k/getUpdates "HTTP/1.1 200 OK"
+2026-08-18 16:49:33,694 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8935045945:AAENJUB7xZx7L44MtdrkQ6aZ81Xbwn4Nr2k/sendMessage "HTTP/1.1 200 OK"
+2026-08-18 16:49:34,314 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8935045945:AAENJUB7xZx7L44MtdrkQ6aZ81Xbwn4Nr2k/sendMessage "HTTP/1.1 200 OK"

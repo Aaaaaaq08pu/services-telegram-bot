@@ -1010,6 +1010,23 @@ async def cancel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def unknown_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❓ أمر غير معروف. استخدم /start للبدء.")
 
+async def test_ui_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """أمر اختبار مخصص للمطور: يعيد إرسال القائمة الرئيسية للتحقق من الواجهة."""
+    user = update.effective_user
+    create_user(user.id, user.username)
+    balance = get_balance(user.id)
+    name = user.first_name or user.username or "عزيزي"
+    text = (
+        "• ≪ اهلا بك عزيزي : " + name + " 🤚\n"
+        "══════ ☠️ ══════\n"
+        f"• رصيد حسابك الان : {balance} ⏎\n"
+        f"• اايدي الحساب : {user.id} 👤\n"
+        "════════════════\n"
+        "≪ اتحكم بالبوت من خلال الازرار بالأسفل\n"
+        "⬇️"
+    )
+    await update.message.reply_text(text, parse_mode="HTML", reply_markup=build_main_keyboard())
+
 # ============================================================
 # ============ التشغيل ========================================
 # ============================================================
@@ -1044,6 +1061,7 @@ def main():
     app.add_handler(CommandHandler("add", add_balance_command))
     app.add_handler(CommandHandler("stats", stats_command))
     app.add_handler(CommandHandler("cancel", cancel_handler))
+    app.add_handler(CommandHandler("testui", test_ui_command))
     # محادثة الرشق
     spam_conv = ConversationHandler(
         entry_points=[
@@ -1079,7 +1097,7 @@ def main():
     app.add_handler(nums_conv)
     # الأزرار العامة (يجب أن تكون قبل معالج الرسائل العام)
     app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(MessageHandler(filters.COMMAND, unknown_handler))
+    app.add_handler(MessageHandler(filters.COMMAND, unknown_handler), group=1)
     logger.info("🚀 تم تشغيل البوت بنجاح!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
