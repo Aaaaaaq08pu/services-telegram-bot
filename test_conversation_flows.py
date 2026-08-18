@@ -155,6 +155,37 @@ class ConversationFlowTests(unittest.IsolatedAsyncioTestCase):
         log_order.assert_called_once_with(77, "رشق", "https://t.me/PublicChannel", 10, bot.SPAM_SERVICE_COST, "ناجح")
         self.assertIn("تم تنفيذ طلب الرشق بنجاح", query.edits[-1][0])
 
+    async def test_complete_spam_conversation_validates_confirms_and_executes(self):
+        context = SimpleNamespace(user_data={})
+        user = SimpleNamespace(id=77, username="tester")
+        start_message = FakeMessage("/spam")
+        link_message = FakeMessage("https://t.me/PublicChannel")
+        execute_query = FakeQuery("spam_execute", user_id=77)
+
+        with (
+            patch.object(bot, "create_user"),
+            patch.object(bot, "get_balance", return_value=100),
+            patch.object(bot, "spam_service_boost", return_value={"success": True, "message": "تم", "order_id": 123}),
+            patch.object(bot, "deduct_balance") as deduct_balance,
+            patch.object(bot, "log_order") as log_order,
+        ):
+            start_state = await bot.spam_start(
+                SimpleNamespace(effective_user=user, effective_message=start_message), context
+            )
+            link_state = await bot.spam_link_received(SimpleNamespace(message=link_message), context)
+            execute_state = await bot.spam_execute_callback(
+                SimpleNamespace(callback_query=execute_query), context
+            )
+
+        self.assertEqual(start_state, bot.WAITING_SPAM_LINK)
+        self.assertEqual(link_state, bot.WAITING_SPAM_QUANTITY)
+        self.assertEqual(execute_state, bot.ConversationHandler.END)
+        self.assertEqual(context.user_data["spam_link"], "https://t.me/PublicChannel")
+        self.assertEqual(context.user_data["spam_quantity"], bot.SPAM_MAX_QUANTITY)
+        self.assertIn("تم استلام الرابط", link_message.replies[-1][0])
+        deduct_balance.assert_called_once_with(77, bot.SPAM_SERVICE_COST)
+        log_order.assert_called_once_with(77, "رشق", "https://t.me/PublicChannel", 10, bot.SPAM_SERVICE_COST, "ناجح")
+
     async def test_verified_number_reservation_failure_does_not_deduct_balance(self):
         query = FakeQuery("reserve_smsman", user_id=77)
         update = SimpleNamespace(callback_query=query)
